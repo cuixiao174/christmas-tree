@@ -1,13 +1,49 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { TreeMode } from '../types';
 
 interface UIOverlayProps {
   mode: TreeMode;
   onToggle: () => void;
+  onPhotosUpload: (photos: string[]) => void;
+  hasPhotos: boolean;
 }
 
-export const UIOverlay: React.FC<UIOverlayProps> = ({ mode, onToggle }) => {
+export const UIOverlay: React.FC<UIOverlayProps> = ({ mode, onToggle, onPhotosUpload, hasPhotos }) => {
   const isFormed = mode === TreeMode.FORMED;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const photoUrls: string[] = [];
+    const readers: Promise<string>[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.type.startsWith('image/')) continue;
+
+      const promise = new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            resolve(event.target.result as string);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+
+      readers.push(promise);
+    }
+
+    Promise.all(readers).then((urls) => {
+      onPhotosUpload(urls);
+    });
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
 
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none flex flex-col justify-between p-8 z-10">
@@ -17,10 +53,28 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({ mode, onToggle }) => {
         <h1 className="text-4xl md:text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#F5E6BF] to-[#D4AF37] font-serif drop-shadow-lg tracking-wider text-center">
           Merry Christmas
         </h1>
-        {/* <div className="w-32 h-1 bg-[#D4AF37] mt-4 rounded-full shadow-[0_0_10px_#D4AF37]"></div>
-        <p className="text-[#D4AF37] mt-2 font-serif italic opacity-80 text-sm tracking-widest uppercase">
-          Luxury • Elegance • Tradition
-        </p> */}
+        
+        {/* Upload Button - Only show when no photos uploaded */}
+        {!hasPhotos && (
+          <div className="mt-6 pointer-events-auto">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <button
+              onClick={handleUploadClick}
+              className="group px-8 py-3 border-2 border-[#D4AF37] bg-black/50 backdrop-blur-md overflow-hidden transition-all duration-500 hover:shadow-[0_0_30px_#D4AF37] hover:border-[#fff] hover:bg-[#D4AF37]/20"
+            >
+              <span className="relative z-10 font-serif text-lg md:text-xl text-[#D4AF37] tracking-[0.1em] group-hover:text-white transition-colors">
+                上传照片
+              </span>
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Control Panel */}

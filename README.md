@@ -28,19 +28,16 @@ TargetPosition：构成树木圆锥形状的目标坐标。 在 useFrame 中根�
    npm install
    ```
 
-3. **Add your photos (optional):**
-   - Place photos in `public/photos/` directory
-   - Name them sequentially: `1.jpg`, `2.jpg`, ... `13.jpg`
-   - Photos will be displayed on the polaroid frames
-
-4. **Run the development server:**
+3. **Run the development server:**
    ```bash
    npm run dev
    ```
 
-5. **Open your browser:**
+4. **Open your browser:**
    - Navigate to `http://localhost:3010`
    - Allow camera access for gesture control
+   - Click "上传照片" to upload your photos
+
 
 ## 🎯 Usage
 

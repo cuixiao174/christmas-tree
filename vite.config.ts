@@ -5,9 +5,25 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
+      base: '/',
       server: {
         port: 3010,
         host: '0.0.0.0',
+      },
+      build: {
+        outDir: 'dist',
+        assetsDir: 'assets',
+        sourcemap: false,
+        minify: 'terser',
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              'react-vendor': ['react', 'react-dom'],
+              'three-vendor': ['three', '@react-three/fiber', '@react-three/drei'],
+              'postprocessing-vendor': ['@react-three/postprocessing', 'postprocessing'],
+            }
+          }
+        }
       },
       plugins: [react()],
       define: {

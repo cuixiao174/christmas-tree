@@ -26,6 +26,7 @@ const PHOTO_COUNT = 22; // How many polaroid frames to generate
 
 interface PolaroidsProps {
   mode: TreeMode;
+  uploadedPhotos: string[];
 }
 
 interface PhotoData {
@@ -168,23 +169,26 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
           anchorX="center"
           anchorY="middle"
         >
-          {error ? "No Img" : "Fox Family"}
+          {error ? "Image not found" : "Happy Memories"}
         </Text>
       </group>
     </group>
   );
 };
 
-export const Polaroids: React.FC<PolaroidsProps> = ({ mode }) => {
+export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos }) => {
   const photoData = useMemo(() => {
     const data: PhotoData[] = [];
     const height = 9; // Range of height on tree
     const maxRadius = 5.0; // Slightly outside the foliage radius (which is approx 5 at bottom)
+    
+    // Use uploaded photos count if available, otherwise use PHOTO_COUNT
+    const count = uploadedPhotos.length > 0 ? uploadedPhotos.length : PHOTO_COUNT;
 
-    for (let i = 0; i < PHOTO_COUNT; i++) {
+    for (let i = 0; i < count; i++) {
       // 1. Target Position
       // Distributed nicely on the cone surface
-      const yNorm = 0.2 + (i / PHOTO_COUNT) * 0.6; // Keep between 20% and 80% height
+      const yNorm = 0.2 + (i / count) * 0.6; // Keep between 20% and 80% height
       const y = yNorm * height;
       
       // Radius decreases as we go up
@@ -206,7 +210,7 @@ export const Polaroids: React.FC<PolaroidsProps> = ({ mode }) => {
       const relativeZ = 20; // Camera Z
       
       // Create positions spread widely around camera, very close
-      const angle = (i / PHOTO_COUNT) * Math.PI * 2; // Distribute evenly
+      const angle = (i / count) * Math.PI * 2; // Distribute evenly
       const distance = 3 + Math.random() * 4; // Distance 3-7 units (very close)
       const heightSpread = (Math.random() - 0.5) * 8; // Height variation -4 to +4 (more spread)
       
@@ -216,16 +220,21 @@ export const Polaroids: React.FC<PolaroidsProps> = ({ mode }) => {
         relativeZ - 4 + distance * Math.sin(angle) * 0.5 // Very close to camera (Z ~16-19)
       );
 
+      // Use uploaded photo URL if available, otherwise use default path
+      const url = uploadedPhotos.length > 0 
+        ? uploadedPhotos[i]
+        : `/photos/${i + 1}.jpg`;
+
       data.push({
         id: i,
-        url: `/photos/${i + 1}.jpg`, // Looks for 1.jpg, 2.jpg...
+        url,
         chaosPos,
         targetPos,
         speed: 0.8 + Math.random() * 1.5 // Variable speed
       });
     }
     return data;
-  }, []);
+  }, [uploadedPhotos]);
 
   return (
     <group>

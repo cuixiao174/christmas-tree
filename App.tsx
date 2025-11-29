@@ -48,6 +48,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 export default function App() {
   const [mode, setMode] = useState<TreeMode>(TreeMode.FORMED);
   const [handPosition, setHandPosition] = useState<{ x: number; y: number; detected: boolean }>({ x: 0.5, y: 0.5, detected: false });
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
 
   const toggleMode = () => {
     setMode((prev) => (prev === TreeMode.FORMED ? TreeMode.CHAOS : TreeMode.FORMED));
@@ -55,6 +56,10 @@ export default function App() {
 
   const handleHandPosition = (x: number, y: number, detected: boolean) => {
     setHandPosition({ x, y, detected });
+  };
+
+  const handlePhotosUpload = (photos: string[]) => {
+    setUploadedPhotos(photos);
   };
 
   return (
@@ -67,7 +72,7 @@ export default function App() {
           shadows
         >
           <Suspense fallback={null}>
-            <Experience mode={mode} handPosition={handPosition} />
+            <Experience mode={mode} handPosition={handPosition} uploadedPhotos={uploadedPhotos} />
           </Suspense>
         </Canvas>
       </ErrorBoundary>
@@ -79,7 +84,7 @@ export default function App() {
         dataStyles={{ color: '#D4AF37', fontFamily: 'Cinzel' }}
       />
       
-      <UIOverlay mode={mode} onToggle={toggleMode} />
+      <UIOverlay mode={mode} onToggle={toggleMode} onPhotosUpload={handlePhotosUpload} hasPhotos={uploadedPhotos.length > 0} />
       
       {/* Gesture Control Module */}
       <GestureController currentMode={mode} onModeChange={setMode} onHandPosition={handleHandPosition} />
