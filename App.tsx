@@ -5,7 +5,9 @@ import { Loader } from '@react-three/drei';
 import { Experience } from './components/Experience';
 import { UIOverlay } from './components/UIOverlay';
 import { GestureController } from './components/GestureController';
+import { MusicPlayer } from './components/MusicPlayer';
 import { TreeMode } from './types';
+
 
 // Simple Error Boundary to catch 3D resource loading errors (like textures)
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
@@ -49,6 +51,7 @@ export default function App() {
   const [mode, setMode] = useState<TreeMode>(TreeMode.FORMED);
   const [handPosition, setHandPosition] = useState<{ x: number; y: number; detected: boolean }>({ x: 0.5, y: 0.5, detected: false });
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  const [photoDisplayMode, setPhotoDisplayMode] = useState<'random' | 'sequential'>('random');
 
   const toggleMode = () => {
     setMode((prev) => (prev === TreeMode.FORMED ? TreeMode.CHAOS : TreeMode.FORMED));
@@ -62,6 +65,11 @@ export default function App() {
     setUploadedPhotos(photos);
   };
 
+  const handleReplacePhotos = () => {
+    // Clear current photos to prepare for new ones
+    setUploadedPhotos([]);
+  };
+
   return (
     <div className="w-full h-screen relative bg-gradient-to-b from-black via-[#001a0d] to-[#0a2f1e]">
       <ErrorBoundary>
@@ -72,7 +80,7 @@ export default function App() {
           shadows
         >
           <Suspense fallback={null}>
-            <Experience mode={mode} handPosition={handPosition} uploadedPhotos={uploadedPhotos} />
+            <Experience mode={mode} handPosition={handPosition} uploadedPhotos={uploadedPhotos} photoDisplayMode={photoDisplayMode} />
           </Suspense>
         </Canvas>
       </ErrorBoundary>
@@ -84,7 +92,18 @@ export default function App() {
         dataStyles={{ color: '#D4AF37', fontFamily: 'Cinzel' }}
       />
       
-      <UIOverlay mode={mode} onToggle={toggleMode} onPhotosUpload={handlePhotosUpload} hasPhotos={uploadedPhotos.length > 0} />
+      <UIOverlay 
+        mode={mode} 
+        onToggle={toggleMode} 
+        onPhotosUpload={handlePhotosUpload} 
+        hasPhotos={uploadedPhotos.length > 0} 
+        onReplacePhotos={handleReplacePhotos}
+        photoDisplayMode={photoDisplayMode}
+        onPhotoDisplayModeChange={setPhotoDisplayMode}
+      />
+      
+      {/* Music Player Module */}
+      <MusicPlayer musicSrc="/music/music.mp3" />
       
       {/* Gesture Control Module */}
       <GestureController currentMode={mode} onModeChange={setMode} onHandPosition={handleHandPosition} />

@@ -20,7 +20,12 @@ export const GestureController: React.FC<GestureControllerProps> = ({ onModeChan
   // Debounce logic refs
   const openFrames = useRef(0);
   const closedFrames = useRef(0);
+  const pinchFrames = useRef(0);
   const CONFIDENCE_THRESHOLD = 5; // Number of consecutive frames to confirm gesture
+  
+  // Hand position smoothing
+  const smoothedHandPos = useRef<{ x: number; y: number } | null>(null);
+  const MOVEMENT_THRESHOLD = 0.02; // Minimum movement threshold to trigger camera update
 
   useEffect(() => {
     let handLandmarker: HandLandmarker | null = null;
@@ -183,9 +188,26 @@ export const GestureController: React.FC<GestureControllerProps> = ({ onModeChan
       
       // Send hand position for camera control
       // Normalize coordinates: x and y are in [0, 1], center at (0.5, 0.5)
-      setHandPos({ x: palmCenterX, y: palmCenterY });
+      
+      // Apply smoothing to hand position
+      if (!smoothedHandPos.current) {
+        smoothedHandPos.current = { x: palmCenterX, y: palmCenterY };
+      } else {
+        // Smooth the position with lerp
+        const smoothingFactor = 0.7; // Higher values = less smoothing
+        smoothedHandPos.current.x = smoothedHandPos.current.x * smoothingFactor + palmCenterX * (1 - smoothingFactor);
+        smoothedHandPos.current.y = smoothedHandPos.current.y * smoothingFactor + palmCenterY * (1 - smoothingFactor);
+      }
+      
+      // Only update if movement exceeds threshold
+      const movement = Math.hypot(
+        palmCenterX - (smoothedHandPos.current?.x || 0.5),
+        palmCenterY - (smoothedHandPos.current?.y || 0.5)
+      );
+      
+      setHandPos({ x: smoothedHandPos.current.x, y: smoothedHandPos.current.y });
       if (onHandPosition) {
-        onHandPosition(palmCenterX, palmCenterY, true);
+        onHandPosition(smoothedHandPos.current.x, smoothedHandPos.current.y, true);
       }
       
       const fingerTips = [8, 12, 16, 20];
@@ -214,11 +236,41 @@ export const GestureController: React.FC<GestureControllerProps> = ({ onModeChan
       const distThumbBase = Math.hypot(thumbBase.x - wrist.x, thumbBase.y - wrist.y);
       if (distThumbTip > distThumbBase * 1.2) extendedFingers++;
 
+      // Check for OK gesture (thumb and index finger making a circle, other fingers extended)
+      const indexTip = landmarks[8];
+      const indexBase = landmarks[5];
+      const thumbTip2 = landmarks[4];
+      const thumbBase2 = landmarks[2];
+      
+      // Calculate distance between thumb tip and index tip
+      const pinchDistance = Math.hypot(indexTip.x - thumbTip2.x, indexTip.y - thumbTip2.y);
+      
+      // Calculate if thumb and index are making a circle (tips close but bases apart)
+      const tipsClose = pinchDistance < 0.08; // Tips should be close
+      const basesApart = Math.hypot(thumbBase2.x - indexBase.x, thumbBase2.y - indexBase.y) > 0.15; // Bases should be apart
+      
+      const isOKGesture = tipsClose && basesApart && extendedFingers >= 3; // At least 3 fingers extended (excluding thumb)
+
       // DECISION
-      if (extendedFingers >= 4) {
+      if (isOKGesture) {
+        // OK GESTURE -> SHOW PHOTOS
+        pinchFrames.current++;
+        openFrames.current = 0;
+        closedFrames.current = 0;
+        
+        setGestureStatus("Detected: OK (Show Photos)");
+
+        if (pinchFrames.current > CONFIDENCE_THRESHOLD) {
+            if (lastModeRef.current !== TreeMode.PINCH) {
+                lastModeRef.current = TreeMode.PINCH;
+                onModeChange(TreeMode.PINCH);
+            }
+        }
+      } else if (extendedFingers >= 4) {
         // OPEN HAND -> UNLEASH (CHAOS)
         openFrames.current++;
         closedFrames.current = 0;
+        pinchFrames.current = 0;
         
         setGestureStatus("Detected: OPEN (Unleash)");
 
@@ -233,6 +285,7 @@ export const GestureController: React.FC<GestureControllerProps> = ({ onModeChan
         // CLOSED FIST -> RESTORE (FORMED)
         closedFrames.current++;
         openFrames.current = 0;
+        pinchFrames.current = 0;
         
         setGestureStatus("Detected: CLOSED (Restore)");
 
@@ -247,6 +300,7 @@ export const GestureController: React.FC<GestureControllerProps> = ({ onModeChan
         setGestureStatus("Detected: ...");
         openFrames.current = 0;
         closedFrames.current = 0;
+        pinchFrames.current = 0;
       }
     };
 
@@ -266,6 +320,11 @@ export const GestureController: React.FC<GestureControllerProps> = ({ onModeChan
   return (
     <div className="absolute top-6 right-[8%] z-50 flex flex-col items-end pointer-events-none">
 
+      {/* Gesture Status Display */}
+      <div className="mb-4 px-4 py-2 bg-black/70 backdrop-blur-sm border border-[#D4AF37]/50 rounded-lg shadow-lg">
+        <div className="text-[#D4AF37] text-sm font-semibold mb-1">手势状态</div>
+        <div className="text-white text-base">{gestureStatus}</div>
+      </div>
       
       {/* Camera Preview Frame */}
       <div className="relative w-[18.75vw] h-[14.0625vw] border-2 border-[#D4AF37] rounded-lg overflow-hidden shadow-[0_0_20px_rgba(212,175,55,0.3)] bg-black">

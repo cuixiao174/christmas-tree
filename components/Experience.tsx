@@ -14,59 +14,76 @@ interface ExperienceProps {
   mode: TreeMode;
   handPosition: { x: number; y: number; detected: boolean };
   uploadedPhotos: string[];
+  photoDisplayMode?: 'random' | 'sequential';
 }
 
-export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uploadedPhotos }) => {
+export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uploadedPhotos, photoDisplayMode = 'random' }) => {
   const controlsRef = useRef<any>(null);
+  
+  // Store previous hand position to calculate movement
+  const prevHandPos = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
+  const MOVEMENT_THRESHOLD = 0.01; // Minimum movement threshold to trigger camera update
 
   // Update camera rotation based on hand position
   useFrame((_, delta) => {
     if (controlsRef.current && handPosition.detected) {
-      const controls = controlsRef.current;
+      // Calculate movement distance
+      const movement = Math.hypot(
+        handPosition.x - prevHandPos.current.x,
+        handPosition.y - prevHandPos.current.y
+      );
       
-      // Map hand position to spherical coordinates
-      // x: 0 (left) to 1 (right) -> azimuthal angle (horizontal rotation)
-      // y: 0 (top) to 1 (bottom) -> polar angle (vertical tilt)
-      
-      // Target azimuthal angle: increased range for larger rotation
-      const targetAzimuth = (handPosition.x - 0.5) * Math.PI * 3; // Increased from 2 to 3
-      
-      // Adjust Y mapping so natural hand position gives best view
-      // Offset Y so hand at 0.4-0.5 range gives centered view
-      const adjustedY = (handPosition.y - 0.2) * 2.0; // Increased sensitivity from 1.5 to 2.0
-      const clampedY = Math.max(0, Math.min(1, adjustedY)); // Clamp to 0-1
-      
-      // Target polar angle: PI/4 to PI/1.8 (constrained vertical angle)
-      const minPolar = Math.PI / 4;
-      const maxPolar = Math.PI / 1.8;
-      const targetPolar = minPolar + clampedY * (maxPolar - minPolar);
-      
-      // Get current angles
-      const currentAzimuth = controls.getAzimuthalAngle();
-      const currentPolar = controls.getPolarAngle();
-      
-      // Calculate angle differences (handle wrapping for azimuth)
-      let azimuthDiff = targetAzimuth - currentAzimuth;
-      if (azimuthDiff > Math.PI) azimuthDiff -= Math.PI * 2;
-      if (azimuthDiff < -Math.PI) azimuthDiff += Math.PI * 2;
-      
-      // Smoothly interpolate angles
-      const lerpSpeed = 8; // Increased from 5 to 8 for faster response
-      const newAzimuth = currentAzimuth + azimuthDiff * delta * lerpSpeed;
-      const newPolar = currentPolar + (targetPolar - currentPolar) * delta * lerpSpeed;
-      
-      // Calculate new camera position in spherical coordinates
-      const radius = controls.getDistance();
-      const targetY = 4; // Tree center height
-      
-      const x = radius * Math.sin(newPolar) * Math.sin(newAzimuth);
-      const y = targetY + radius * Math.cos(newPolar);
-      const z = radius * Math.sin(newPolar) * Math.cos(newAzimuth);
-      
-      // Update camera position and target
-      controls.object.position.set(x, y, z);
-      controls.target.set(0, targetY, 0);
-      controls.update();
+      // Only update camera if movement exceeds threshold
+      if (movement > MOVEMENT_THRESHOLD) {
+        const controls = controlsRef.current;
+        
+        // Map hand position to spherical coordinates
+        // x: 0 (left) to 1 (right) -> azimuthal angle (horizontal rotation)
+        // y: 0 (top) to 1 (bottom) -> polar angle (vertical tilt)
+        
+        // Target azimuthal angle: increased range for larger rotation
+        const targetAzimuth = (handPosition.x - 0.5) * Math.PI * 2; // Reduced from 3 to 2 for less sensitivity
+        
+        // Adjust Y mapping so natural hand position gives best view
+        // Offset Y so hand at 0.4-0.5 range gives centered view
+        const adjustedY = (handPosition.y - 0.2) * 1.5; // Reduced from 2.0 to 1.5 for less sensitivity
+        const clampedY = Math.max(0, Math.min(1, adjustedY)); // Clamp to 0-1
+        
+        // Target polar angle: PI/4 to PI/1.8 (constrained vertical angle)
+        const minPolar = Math.PI / 4;
+        const maxPolar = Math.PI / 1.8;
+        const targetPolar = minPolar + clampedY * (maxPolar - minPolar);
+        
+        // Get current angles
+        const currentAzimuth = controls.getAzimuthalAngle();
+        const currentPolar = controls.getPolarAngle();
+        
+        // Calculate angle differences (handle wrapping for azimuth)
+        let azimuthDiff = targetAzimuth - currentAzimuth;
+        if (azimuthDiff > Math.PI) azimuthDiff -= Math.PI * 2;
+        if (azimuthDiff < -Math.PI) azimuthDiff += Math.PI * 2;
+        
+        // Smoothly interpolate angles
+        const lerpSpeed = 4; // Reduced from 8 to 4 for smoother movement
+        const newAzimuth = currentAzimuth + azimuthDiff * delta * lerpSpeed;
+        const newPolar = currentPolar + (targetPolar - currentPolar) * delta * lerpSpeed;
+        
+        // Calculate new camera position in spherical coordinates
+        const radius = controls.getDistance();
+        const targetY = 7; // Tree center height
+        
+        const x = radius * Math.sin(newPolar) * Math.sin(newAzimuth);
+        const y = targetY + radius * Math.cos(newPolar);
+        const z = radius * Math.sin(newPolar) * Math.cos(newAzimuth);
+        
+        // Update camera position and target
+        controls.object.position.set(x, y, z);
+        controls.target.set(0, targetY, 0);
+        controls.update();
+        
+        // Update previous position
+        prevHandPos.current = { x: handPosition.x, y: handPosition.y };
+      }
     }
   });
   return (
@@ -97,10 +114,10 @@ export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uplo
       />
       <pointLight position={[-10, 5, -10]} intensity={1} color="#D4AF37" />
 
-      <group position={[0, -5, 0]}>
+      <group position={[0, -2, 0]}>
         <Foliage mode={mode} count={12000} />
         <Ornaments mode={mode} count={600} />
-        <Polaroids mode={mode} uploadedPhotos={uploadedPhotos} />
+        <Polaroids mode={mode} uploadedPhotos={uploadedPhotos} photoDisplayMode={photoDisplayMode} />
         <TreeStar mode={mode} />
         
         {/* Floor Reflections */}

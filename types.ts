@@ -1,6 +1,7 @@
 export enum TreeMode {
   CHAOS = 'CHAOS',
-  FORMED = 'FORMED'
+  FORMED = 'FORMED',
+  PINCH = 'PINCH'
 }
 
 export interface Coordinates {

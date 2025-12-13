@@ -37,6 +37,7 @@ TargetPosition：构成树木圆锥形状的目标坐标。 在 useFrame 中根�
    - Navigate to `http://localhost:3010`
    - Allow camera access for gesture control
    - Click "上传照片" to upload your photos
+   - Add "All I Want For Christmas Is You" as `music.mp3` to the `public/music/` directory for background music
 
 
 ## 🎯 Usage
@@ -49,6 +50,7 @@ TargetPosition：构成树木圆锥形状的目标坐标。 在 useFrame 中根�
    - Up/Down: Vertical tilt
 3. **Open your hand** (spread all fingers): Unleash chaos mode
 4. **Close your fist**: Restore tree to formed mode
+5. **Click the snowflake icon** in the top-left corner to toggle background music on/off
 
 ### Mouse Controls
 

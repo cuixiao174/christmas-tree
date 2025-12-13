@@ -36,8 +36,8 @@ const vertexShader = `
     
     // Add a slight "breathing" wind effect when formed
     if (easedProgress > 0.9) {
-      newPos.x += sin(uTime * 2.0 + newPos.y) * 0.05;
-      newPos.z += cos(uTime * 1.5 + newPos.y) * 0.05;
+      newPos.x += sin(uTime * 1.0 + newPos.y) * 0.02; // Further reduced amplitude and frequency
+      newPos.z += cos(uTime * 0.8 + newPos.y) * 0.02; // Further reduced amplitude and frequency
     }
 
     vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);

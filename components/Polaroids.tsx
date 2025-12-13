@@ -27,6 +27,7 @@ const PHOTO_COUNT = 22; // How many polaroid frames to generate
 interface PolaroidsProps {
   mode: TreeMode;
   uploadedPhotos: string[];
+  photoDisplayMode?: 'random' | 'sequential';
 }
 
 interface PhotoData {
@@ -34,7 +35,9 @@ interface PhotoData {
   url: string;
   chaosPos: THREE.Vector3;
   targetPos: THREE.Vector3;
+  pinchPos: THREE.Vector3;
   speed: number;
+  isSelected: boolean;
 }
 
 const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }> = ({ data, mode, index }) => {
@@ -67,17 +70,56 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
     if (!groupRef.current) return;
 
     const isFormed = mode === TreeMode.FORMED;
+    const isPinch = mode === TreeMode.PINCH;
     const time = state.clock.elapsedTime;
     
     // 1. Position Interpolation
-    const targetPos = isFormed ? data.targetPos : data.chaosPos;
+    let targetPos;
+    if (isPinch && data.isSelected) {
+      // Only selected photo moves to pinch position
+      targetPos = data.pinchPos;
+    } else if (isFormed) {
+      targetPos = data.targetPos;
+    } else {
+      targetPos = data.chaosPos;
+    }
+    
     const step = delta * data.speed;
     
     // Smooth lerp to target position
     groupRef.current.position.lerp(targetPos, step);
 
     // 2. Rotation & Sway Logic
-    if (isFormed) {
+    if (isPinch && data.isSelected) {
+      // Pinch mode - selected photo flies to front center and faces camera with scaling effect
+      const cameraPos = new THREE.Vector3(0, 0, 8); // Adjusted camera position for direct viewing
+      const dummy = new THREE.Object3D();
+      dummy.position.copy(groupRef.current.position);
+      
+      // Make photo face directly forward (towards the viewer)
+      dummy.lookAt(cameraPos);
+      
+      // Smoothly rotate to face camera
+      groupRef.current.quaternion.slerp(dummy.quaternion, delta * 8);
+      
+      // Add subtle floating animation for a more dynamic feel
+      const floatX = Math.sin(time * 0.8 + swayOffset) * 0.005;
+      const floatY = Math.cos(time * 0.6 + swayOffset) * 0.005;
+      
+      // Apply floating to position
+      groupRef.current.position.x += floatX;
+      groupRef.current.position.y += floatY;
+      
+      // Scale effect for pinch mode - larger for better visibility
+      const scaleTarget = 4.0; // Increased scale for better visibility
+      groupRef.current.scale.lerp(new THREE.Vector3(scaleTarget, scaleTarget, scaleTarget), delta * 4);
+      
+      // Ensure photo is perfectly flat and facing forward - override any rotation
+      groupRef.current.rotation.z = 0;
+      groupRef.current.rotation.x = 0;
+      groupRef.current.rotation.y = 0; // Explicitly set Y rotation to 0 for perfect front-facing
+      
+    } else if (isFormed) {
         // Look at center but face outward
         const dummy = new THREE.Object3D();
         dummy.position.copy(groupRef.current.position);
@@ -103,6 +145,9 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
         groupRef.current.rotation.z = currentRot.z + swayAngle * 0.05; 
         groupRef.current.rotation.x = currentRot.x + tiltAngle * 0.05;
         
+        // Reset scale to normal
+        groupRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), delta * 3);
+        
     } else {
         // Chaos mode - face toward camera with gentle floating
         // Camera position relative to scene group: [0, 9, 20]
@@ -123,6 +168,9 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
         const currentRot = new THREE.Euler().setFromQuaternion(groupRef.current.quaternion);
         groupRef.current.rotation.x = currentRot.x + wobbleX;
         groupRef.current.rotation.z = currentRot.z + wobbleZ;
+        
+        // Reset scale to normal
+        groupRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), delta * 3);
     }
   });
 
@@ -176,7 +224,31 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
   );
 };
 
-export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos }) => {
+export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, photoDisplayMode = 'random' }) => {
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [sequentialIndex, setSequentialIndex] = useState<number>(0); // Track current index for sequential mode
+  
+  // Select a photo when entering PINCH mode
+  useEffect(() => {
+    if (mode === TreeMode.PINCH && uploadedPhotos.length > 0) {
+      if (selectedPhotoIndex === null) {
+        let newIndex;
+        if (photoDisplayMode === 'random') {
+          // Random mode: select a random photo
+          newIndex = Math.floor(Math.random() * uploadedPhotos.length);
+        } else {
+          // Sequential mode: use the current sequential index
+          newIndex = sequentialIndex;
+          // Update for next time
+          setSequentialIndex((prev) => (prev + 1) % uploadedPhotos.length);
+        }
+        setSelectedPhotoIndex(newIndex);
+      }
+    } else {
+      setSelectedPhotoIndex(null);
+    }
+  }, [mode, uploadedPhotos.length, selectedPhotoIndex, photoDisplayMode, sequentialIndex]);
+
   const photoData = useMemo(() => {
     // Don't render any photos if none are uploaded
     if (uploadedPhotos.length === 0) {
@@ -229,11 +301,17 @@ export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos }) =>
         url: uploadedPhotos[i],
         chaosPos,
         targetPos,
-        speed: 0.8 + Math.random() * 1.5 // Variable speed
+        pinchPos: new THREE.Vector3(
+          0, // Center horizontally
+          8, // Center vertically at eye level
+          8 // Position closer to camera for better visibility
+        ),
+        speed: 0.8 + Math.random() * 1.5, // Variable speed
+        isSelected: i === selectedPhotoIndex
       });
     }
     return data;
-  }, [uploadedPhotos]);
+  }, [uploadedPhotos, selectedPhotoIndex]);
 
   return (
     <group>
