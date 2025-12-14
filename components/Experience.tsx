@@ -1,13 +1,13 @@
 
 import React, { useRef } from 'react';
 import { Environment, OrbitControls, ContactShadows } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
-import { BlendFunction } from 'postprocessing';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import { useFrame } from '@react-three/fiber';
 import { Foliage } from './Foliage';
 import { Ornaments } from './Ornaments';
 import { Polaroids } from './Polaroids';
 import { TreeStar } from './TreeStar';
+import { TreeTrunk } from './TreeTrunk';
 import { TreeMode } from '../types';
 
 interface ExperienceProps {
@@ -15,14 +15,15 @@ interface ExperienceProps {
   handPosition: { x: number; y: number; detected: boolean };
   uploadedPhotos: string[];
   photoDisplayMode?: 'random' | 'sequential';
+  photoLabels?: string[];
 }
 
-export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uploadedPhotos, photoDisplayMode = 'random' }) => {
+export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uploadedPhotos, photoDisplayMode = 'random', photoLabels = [] }) => {
   const controlsRef = useRef<any>(null);
   
   // Store previous hand position to calculate movement
   const prevHandPos = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
-  const MOVEMENT_THRESHOLD = 0.01; // Minimum movement threshold to trigger camera update
+  const MOVEMENT_THRESHOLD = 0.005; // Lower threshold for more responsive camera control
 
   // Update camera rotation based on hand position
   useFrame((_, delta) => {
@@ -42,11 +43,11 @@ export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uplo
         // y: 0 (top) to 1 (bottom) -> polar angle (vertical tilt)
         
         // Target azimuthal angle: increased range for larger rotation
-        const targetAzimuth = (handPosition.x - 0.5) * Math.PI * 2; // Reduced from 3 to 2 for less sensitivity
+        const targetAzimuth = (handPosition.x - 0.5) * Math.PI * 2; // Original sensitivity
         
         // Adjust Y mapping so natural hand position gives best view
         // Offset Y so hand at 0.4-0.5 range gives centered view
-        const adjustedY = (handPosition.y - 0.2) * 1.5; // Reduced from 2.0 to 1.5 for less sensitivity
+        const adjustedY = (handPosition.y - 0.2) * 1.5; // Original sensitivity
         const clampedY = Math.max(0, Math.min(1, adjustedY)); // Clamp to 0-1
         
         // Target polar angle: PI/4 to PI/1.8 (constrained vertical angle)
@@ -63,14 +64,19 @@ export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uplo
         if (azimuthDiff > Math.PI) azimuthDiff -= Math.PI * 2;
         if (azimuthDiff < -Math.PI) azimuthDiff += Math.PI * 2;
         
-        // Smoothly interpolate angles
-        const lerpSpeed = 4; // Reduced from 8 to 4 for smoother movement
+        // Smoothly interpolate angles with optimized speed
+        const lerpSpeed = 10; // Further increased speed for smoother, more responsive camera control
         const newAzimuth = currentAzimuth + azimuthDiff * delta * lerpSpeed;
         const newPolar = currentPolar + (targetPolar - currentPolar) * delta * lerpSpeed;
         
         // Calculate new camera position in spherical coordinates
         const radius = controls.getDistance();
-        const targetY = 7; // Tree center height
+        
+        // Dynamic target Y based on hand position
+        // When hand moves up (lower y value), target Y moves down to tree middle
+        // When hand moves down (higher y value), target Y moves up to tree top
+        const normalizedHandY = Math.max(0, Math.min(1, handPosition.y));
+        const targetY = 7 - normalizedHandY * 4; // Range from 7 (top) to 3 (middle)
         
         const x = radius * Math.sin(newPolar) * Math.sin(newAzimuth);
         const y = targetY + radius * Math.cos(newPolar);
@@ -93,7 +99,7 @@ export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uplo
         enablePan={false} 
         minPolarAngle={Math.PI / 4} 
         maxPolarAngle={Math.PI / 1.8}
-        minDistance={10}
+        minDistance={5}
         maxDistance={30}
         enableDamping
         dampingFactor={0.05}
@@ -116,17 +122,21 @@ export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uplo
 
       <group position={[0, -2, 0]}>
         <Foliage mode={mode} count={12000} />
-        <Ornaments mode={mode} count={600} />
-        <Polaroids mode={mode} uploadedPhotos={uploadedPhotos} photoDisplayMode={photoDisplayMode} />
+        <Ornaments mode={mode} count={800} />
         <TreeStar mode={mode} />
-        
-        {/* Floor Reflections */}
+        <TreeTrunk mode={mode} count={2000} />
         <ContactShadows 
-          opacity={0.7} 
-          scale={30} 
+          position={[0, -1.9, 0]} 
+          opacity={0.4} 
+          scale={20} 
           blur={2} 
-          far={4.5} 
-          color="#000000" 
+          far={10} 
+        />
+        <Polaroids 
+          mode={mode} 
+          uploadedPhotos={uploadedPhotos} 
+          photoDisplayMode={photoDisplayMode} 
+          photoLabels={photoLabels} 
         />
       </group>
 
@@ -134,11 +144,10 @@ export const Experience: React.FC<ExperienceProps> = ({ mode, handPosition, uplo
         <Bloom 
           luminanceThreshold={0.8} 
           mipmapBlur 
-          intensity={1.5} 
-          radius={0.6}
+          intensity={1.2} 
+          radius={0.5}
         />
-        <Vignette eskil={false} offset={0.1} darkness={0.7} />
-        <Noise opacity={0.02} blendFunction={BlendFunction.OVERLAY} />
+        <Vignette eskil={false} offset={0.1} darkness={0.6} />
       </EffectComposer>
     </>
   );

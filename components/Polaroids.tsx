@@ -28,6 +28,7 @@ interface PolaroidsProps {
   mode: TreeMode;
   uploadedPhotos: string[];
   photoDisplayMode?: 'random' | 'sequential';
+  photoLabels?: string[];
 }
 
 interface PhotoData {
@@ -38,12 +39,17 @@ interface PhotoData {
   pinchPos: THREE.Vector3;
   speed: number;
   isSelected: boolean;
+  label: string;
 }
 
-const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }> = ({ data, mode, index }) => {
+const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number; photoLabel?: string }> = ({ data, mode, index, photoLabel = "Happy Memories" }) => {
   const groupRef = useRef<THREE.Group>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [error, setError] = useState(false);
+  
+  // Cache frequently used values
+  const cameraPos = useMemo(() => new THREE.Vector3(0, 9, 20), []);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
 
   // Safe texture loading that won't crash the app if a file is missing
   useEffect(() => {
@@ -84,27 +90,22 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
       targetPos = data.chaosPos;
     }
     
-    const step = delta * data.speed;
-    
-    // Smooth lerp to target position
+    const step = delta * data.speed * 2.0; // Further increased speed for smoother animation
     groupRef.current.position.lerp(targetPos, step);
 
     // 2. Rotation & Sway Logic
     if (isPinch && data.isSelected) {
       // Pinch mode - selected photo flies to front center and faces camera with scaling effect
-      const cameraPos = new THREE.Vector3(0, 0, 8); // Adjusted camera position for direct viewing
-      const dummy = new THREE.Object3D();
+      const pinchCameraPos = new THREE.Vector3(0, 0, 8); // Adjusted camera position for direct viewing
       dummy.position.copy(groupRef.current.position);
-      
-      // Make photo face directly forward (towards the viewer)
-      dummy.lookAt(cameraPos);
+      dummy.lookAt(pinchCameraPos);
       
       // Smoothly rotate to face camera
-      groupRef.current.quaternion.slerp(dummy.quaternion, delta * 8);
+      groupRef.current.quaternion.slerp(dummy.quaternion, delta * 12); // Further increased speed for smoother animation
       
       // Add subtle floating animation for a more dynamic feel
-      const floatX = Math.sin(time * 0.8 + swayOffset) * 0.005;
-      const floatY = Math.cos(time * 0.6 + swayOffset) * 0.005;
+      const floatX = Math.sin(time * 0.8 + swayOffset) * 0.01;
+      const floatY = Math.cos(time * 0.6 + swayOffset) * 0.01;
       
       // Apply floating to position
       groupRef.current.position.x += floatX;
@@ -112,7 +113,7 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
       
       // Scale effect for pinch mode - larger for better visibility
       const scaleTarget = 4.0; // Increased scale for better visibility
-      groupRef.current.scale.lerp(new THREE.Vector3(scaleTarget, scaleTarget, scaleTarget), delta * 4);
+      groupRef.current.scale.lerp(new THREE.Vector3(scaleTarget, scaleTarget, scaleTarget), delta * 8); // Further increased speed for smoother animation
       
       // Ensure photo is perfectly flat and facing forward - override any rotation
       groupRef.current.rotation.z = 0;
@@ -120,57 +121,43 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
       groupRef.current.rotation.y = 0; // Explicitly set Y rotation to 0 for perfect front-facing
       
     } else if (isFormed) {
-        // Look at center but face outward
-        const dummy = new THREE.Object3D();
-        dummy.position.copy(groupRef.current.position);
-        dummy.lookAt(0, groupRef.current.position.y, 0); 
-        dummy.rotateY(Math.PI); // Flip to face out
-        
-        // Base rotation alignment
-        groupRef.current.quaternion.slerp(dummy.quaternion, step);
-        
-        // Physical Swaying (Wind)
-        // Z-axis rotation for side-to-side swing
-        const swayAngle = Math.sin(time * 2.0 + swayOffset) * 0.08;
-        // X-axis rotation for slight front-back tilt
-        const tiltAngle = Math.cos(time * 1.5 + swayOffset) * 0.05;
-        
-        groupRef.current.rotateZ(swayAngle * delta * 5); // Apply over time or directly? 
-        // For stable sway, we add to the base rotation calculated above.
-        // But since we slerp quaternion, let's just add manual rotation after slerp?
-        // Easier: Set rotation directly based on dummy + sway.
-        
-        // Calculate the "perfect" rotation
-        const currentRot = new THREE.Euler().setFromQuaternion(groupRef.current.quaternion);
-        groupRef.current.rotation.z = currentRot.z + swayAngle * 0.05; 
-        groupRef.current.rotation.x = currentRot.x + tiltAngle * 0.05;
-        
-        // Reset scale to normal
-        groupRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), delta * 3);
-        
+      // Formed mode - photos attach to tree and face outward with natural swaying
+      dummy.position.copy(groupRef.current.position);
+      dummy.lookAt(0, groupRef.current.position.y, 0); 
+      dummy.rotateY(Math.PI); // Flip to face out
+      
+      // Base rotation alignment
+      groupRef.current.quaternion.slerp(dummy.quaternion, delta * 7); // Further increased speed for smoother animation
+      
+      // Physical Swaying (Wind)
+      const swayAngle = Math.sin(time * 2.0 + swayOffset) * 0.08; // Original frequency and amplitude
+      const tiltAngle = Math.cos(time * 1.5 + swayOffset) * 0.05; // Original frequency and amplitude
+      
+      const currentRot = new THREE.Euler().setFromQuaternion(groupRef.current.quaternion);
+      groupRef.current.rotation.z = currentRot.z + swayAngle * 0.1; 
+      groupRef.current.rotation.x = currentRot.x + tiltAngle * 0.1;
+      
+      // Reset scale to normal
+      groupRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), delta * 7); // Further increased speed for smoother animation
+      
     } else {
-        // Chaos mode - face toward camera with gentle floating
-        // Camera position relative to scene group: [0, 9, 20]
-        const cameraPos = new THREE.Vector3(0, 9, 20);
-        const dummy = new THREE.Object3D();
-        dummy.position.copy(groupRef.current.position);
-        
-        // Make photos face the camera
-        dummy.lookAt(cameraPos);
-        
-        // Smoothly rotate to face camera
-        groupRef.current.quaternion.slerp(dummy.quaternion, delta * 3);
-        
-        // Add gentle floating wobble
-        const wobbleX = Math.sin(time * 1.5 + swayOffset) * 0.03;
-        const wobbleZ = Math.cos(time * 1.2 + swayOffset) * 0.03;
-        
-        const currentRot = new THREE.Euler().setFromQuaternion(groupRef.current.quaternion);
-        groupRef.current.rotation.x = currentRot.x + wobbleX;
-        groupRef.current.rotation.z = currentRot.z + wobbleZ;
-        
-        // Reset scale to normal
-        groupRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), delta * 3);
+      // Chaos mode - face toward camera with gentle floating
+      dummy.position.copy(groupRef.current.position);
+      dummy.lookAt(cameraPos);
+      
+      // Smoothly rotate to face camera
+      groupRef.current.quaternion.slerp(dummy.quaternion, delta * 7); // Further increased speed for smoother animation
+      
+      // Add gentle floating wobble
+      const wobbleX = Math.sin(time * 1.5 + swayOffset) * 0.03; // Original amplitude
+      const wobbleZ = Math.cos(time * 1.2 + swayOffset) * 0.03; // Original amplitude
+      
+      const currentRot = new THREE.Euler().setFromQuaternion(groupRef.current.quaternion);
+      groupRef.current.rotation.x = currentRot.x + wobbleX;
+      groupRef.current.rotation.z = currentRot.z + wobbleZ;
+      
+      // Reset scale to normal
+      groupRef.current.scale.lerp(new THREE.Vector3(1, 1, 1), delta * 7); // Further increased speed for smoother animation
     }
   });
 
@@ -217,14 +204,14 @@ const PolaroidItem: React.FC<{ data: PhotoData; mode: TreeMode; index: number }>
           anchorX="center"
           anchorY="middle"
         >
-          {error ? "Image not found" : "Happy Memories"}
+          {error ? "Image not found" : photoLabel}
         </Text>
       </group>
     </group>
   );
 };
 
-export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, photoDisplayMode = 'random' }) => {
+export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, photoDisplayMode = 'random', photoLabels }) => {
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [sequentialIndex, setSequentialIndex] = useState<number>(0); // Track current index for sequential mode
   
@@ -307,7 +294,8 @@ export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, phot
           8 // Position closer to camera for better visibility
         ),
         speed: 0.8 + Math.random() * 1.5, // Variable speed
-        isSelected: i === selectedPhotoIndex
+        isSelected: i === selectedPhotoIndex,
+        label: photoLabels && photoLabels[i] ? photoLabels[i] : "Happy Memories"
       });
     }
     return data;
@@ -316,7 +304,7 @@ export const Polaroids: React.FC<PolaroidsProps> = ({ mode, uploadedPhotos, phot
   return (
     <group>
       {photoData.map((data, i) => (
-        <PolaroidItem key={i} index={i} data={data} mode={mode} />
+        <PolaroidItem key={i} index={i} data={data} mode={mode} photoLabel={data.label} />
       ))}
     </group>
   );

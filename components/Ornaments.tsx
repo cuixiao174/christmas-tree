@@ -43,8 +43,9 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
     const red = new THREE.Color("#8B0000"); // Dark Velvet Red
     const emerald = new THREE.Color("#004422");
     const whiteGold = new THREE.Color("#F5E6BF");
+    const blueMetallic = new THREE.Color("#1E90FF"); // Dodger Blue - metallic blue
     
-    const palette = [gold, red, gold, whiteGold];
+    const palette = [gold, red, gold, whiteGold, blueMetallic, blueMetallic]; // Added blue metallic
 
     for (let i = 0; i < count; i++) {
       const rnd = Math.random();
@@ -78,7 +79,7 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
         cR * Math.cos(cPhi)
       );
 
-      const scale = type === 'light' ? 0.15 : (0.2 + Math.random() * 0.25);
+      const scale = type === 'light' ? 0.15 : (0.3 + Math.random() * 0.3);
       const color = type === 'light' ? new THREE.Color("#FFFFAA") : palette[Math.floor(Math.random() * palette.length)];
 
       const data: InstanceData = {
@@ -165,12 +166,12 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
         ref.current!.getMatrixAt(i, dummy.matrix);
         dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
         
-        const step = delta * d.speed;
+        const step = delta * d.speed * 2.0; // Further increased speed for smoother animation
         dummy.position.lerp(dest, step);
 
         // Add wobble when formed
         if (isFormed && dummy.position.distanceTo(d.targetPos) < 0.5) {
-          dummy.position.y += Math.sin(time * 2 + d.chaosPos.x) * 0.002;
+          dummy.position.y += Math.sin(time * 2 + d.chaosPos.x) * 0.005;
         }
 
         // Rotation
@@ -211,6 +212,9 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
           roughness={0.1} 
           metalness={0.9} 
           envMapIntensity={1.5}
+          transparent={false}
+          depthWrite={true}
+          depthTest={true}
         />
       </instancedMesh>
 
@@ -221,6 +225,9 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
           roughness={0.3} 
           metalness={0.5} 
           color="#white" // Tinted by instance color
+          transparent={false}
+          depthWrite={true}
+          depthTest={true}
         />
       </instancedMesh>
 
@@ -232,6 +239,9 @@ export const Ornaments: React.FC<OrnamentsProps> = ({ mode, count }) => {
           emissiveIntensity={2}
           toneMapped={false}
           color="white" // Tinted by instance color (yellowish)
+          transparent={true}
+          depthWrite={false}
+          depthTest={true}
         />
       </instancedMesh>
     </>

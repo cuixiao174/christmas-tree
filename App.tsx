@@ -52,6 +52,8 @@ export default function App() {
   const [handPosition, setHandPosition] = useState<{ x: number; y: number; detected: boolean }>({ x: 0.5, y: 0.5, detected: false });
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [photoDisplayMode, setPhotoDisplayMode] = useState<'random' | 'sequential'>('random');
+  const [photoLabels, setPhotoLabels] = useState<string[]>([]);
+  
 
   const toggleMode = () => {
     setMode((prev) => (prev === TreeMode.FORMED ? TreeMode.CHAOS : TreeMode.FORMED));
@@ -63,11 +65,23 @@ export default function App() {
 
   const handlePhotosUpload = (photos: string[]) => {
     setUploadedPhotos(photos);
+    // Initialize labels for new photos with default text
+    const newLabels = photos.map(() => "Happy Memories");
+    setPhotoLabels(newLabels);
   };
 
   const handleReplacePhotos = () => {
     // Clear current photos to prepare for new ones
     setUploadedPhotos([]);
+    setPhotoLabels([]);
+  };
+
+  const handlePhotoLabelChange = (index: number, label: string) => {
+    setPhotoLabels(prev => {
+      const newLabels = [...prev];
+      newLabels[index] = label;
+      return newLabels;
+    });
   };
 
   return (
@@ -75,12 +89,12 @@ export default function App() {
       <ErrorBoundary>
         <Canvas
           dpr={[1, 2]}
-          camera={{ position: [0, 4, 20], fov: 45 }}
+          camera={{ position: [0, 4, 20], fov: 45, near: 0.1, far: 1000 }}
           gl={{ antialias: false, stencil: false, alpha: false }}
           shadows
         >
           <Suspense fallback={null}>
-            <Experience mode={mode} handPosition={handPosition} uploadedPhotos={uploadedPhotos} photoDisplayMode={photoDisplayMode} />
+            <Experience mode={mode} handPosition={handPosition} uploadedPhotos={uploadedPhotos} photoDisplayMode={photoDisplayMode} photoLabels={photoLabels} />
           </Suspense>
         </Canvas>
       </ErrorBoundary>
@@ -100,6 +114,9 @@ export default function App() {
         onReplacePhotos={handleReplacePhotos}
         photoDisplayMode={photoDisplayMode}
         onPhotoDisplayModeChange={setPhotoDisplayMode}
+        uploadedPhotos={uploadedPhotos}
+        photoLabels={photoLabels}
+        onPhotoLabelChange={handlePhotoLabelChange}
       />
       
       {/* Music Player Module */}

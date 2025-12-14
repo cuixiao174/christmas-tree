@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { TreeMode } from '../types';
 
-interface FoliageProps {
+interface TreeTrunkProps {
   mode: TreeMode;
   count: number;
 }
@@ -34,34 +34,32 @@ const vertexShader = `
     // Interpolate position
     vec3 newPos = mix(aChaosPos, aTargetPos, easedProgress);
     
-    // Add a slight "breathing" wind effect when formed
+    // Add a slight "breathing" effect when formed
     if (easedProgress > 0.9) {
-      newPos.x += sin(uTime * 2.0 + newPos.y) * 0.05; // Original amplitude and frequency
-      newPos.z += cos(uTime * 1.5 + newPos.y) * 0.05; // Original amplitude and frequency
+      newPos.x += sin(uTime * 1.5 + newPos.y) * 0.02;
+      newPos.z += cos(uTime * 1.2 + newPos.y) * 0.02;
     }
 
     vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
     
-    // Size attenuation
-    gl_PointSize = (4.0 * aRandom + 2.0) * (20.0 / -mvPosition.z);
+    // Size attenuation - slightly larger than foliage for trunk visibility
+    gl_PointSize = (5.0 * aRandom + 3.0) * (20.0 / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
 
-    // Color logic: Mix between Chaos Gold and Formed Emerald
-    vec3 goldColor = vec3(1.0, 0.84, 0.0);
-    vec3 emeraldColor = vec3(0.0, 0.4, 0.1);
-    vec3 brightGreen = vec3(0.1, 0.8, 0.2);
+    // Color logic: Brown trunk colors
+    vec3 darkBrown = vec3(0.3, 0.15, 0.05);
+    vec3 lightBrown = vec3(0.6, 0.3, 0.1);
+    vec3 mediumBrown = vec3(0.45, 0.25, 0.08);
     
-    // Sparkle effect
-    float sparkle = sin(uTime * 5.0 + aRandom * 100.0);
-    vec3 finalGreen = mix(emeraldColor, brightGreen, aRandom * 0.3);
+    // Mix between brown shades based on random
+    vec3 finalBrown = mix(darkBrown, lightBrown, aRandom);
+    finalBrown = mix(finalBrown, mediumBrown, sin(aRandom * 3.14159) * 0.5);
     
-    vColor = mix(goldColor, finalGreen, easedProgress);
+    // Add slight variation based on height
+    float heightFactor = (newPos.y + 2.0) / 4.0; // Normalize height
+    finalBrown = mix(finalBrown, darkBrown, heightFactor * 0.3);
     
-    // Add sparkle to the tips
-    if (sparkle > 0.9) {
-      vColor += vec3(0.5);
-    }
-
+    vColor = finalBrown;
     vAlpha = 1.0;
   }
 `;
@@ -83,7 +81,7 @@ const fragmentShader = `
   }
 `;
 
-export const Foliage: React.FC<FoliageProps> = ({ mode, count }) => {
+export const TreeTrunk: React.FC<TreeTrunkProps> = ({ mode, count }) => {
   const meshRef = useRef<THREE.Points>(null);
   
   // Target progress reference for smooth JS-side dampening logic for the uniform
@@ -94,9 +92,10 @@ export const Foliage: React.FC<FoliageProps> = ({ mode, count }) => {
     const target = new Float32Array(count * 3);
     const rnd = new Float32Array(count);
 
-    const goldenRatio = (1 + Math.sqrt(5)) / 2;
-    const height = 12;
-    const maxRadius = 5;
+    // Trunk dimensions
+    const trunkHeight = 2.0;
+    const trunkRadius = 1.0;
+    const trunkBottomY = -2; // Position at the bottom of the tree
 
     for (let i = 0; i < count; i++) {
       // 1. Chaos Positions: Random sphere
@@ -105,19 +104,17 @@ export const Foliage: React.FC<FoliageProps> = ({ mode, count }) => {
       const phi = Math.acos(2 * Math.random() - 1);
       
       chaos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      chaos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) + 5; // Lift up slightly
+      chaos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) + 5;
       chaos[i * 3 + 2] = r * Math.cos(phi);
 
-      // 2. Target Positions: Spiral Cone (Fibonacci Lattice on Cone)
-      // Normalized height 0 to 1
-      const yNorm = i / count; 
-      const y = yNorm * height;
-      const currentRadius = maxRadius * (1 - yNorm);
-      const angle = 2 * Math.PI * goldenRatio * i;
-
-      target[i * 3] = Math.cos(angle) * currentRadius;
-      target[i * 3 + 1] = y;
-      target[i * 3 + 2] = Math.sin(angle) * currentRadius;
+      // 2. Target Positions: Cylinder
+      const height = Math.random() * trunkHeight;
+      const angle = Math.random() * 2 * Math.PI;
+      const radius = Math.random() * trunkRadius;
+      
+      target[i * 3] = Math.cos(angle) * radius;
+      target[i * 3 + 1] = trunkBottomY + height;
+      target[i * 3 + 2] = Math.sin(angle) * radius;
 
       // 3. Randoms
       rnd[i] = Math.random();
@@ -143,7 +140,6 @@ export const Foliage: React.FC<FoliageProps> = ({ mode, count }) => {
       
       // Smoothly interpolate the progress uniform
       const target = mode === TreeMode.FORMED ? 1 : 0;
-      // Using a simple lerp for the uniform value with increased speed for smoother animation
       progressRef.current = THREE.MathUtils.lerp(progressRef.current, target, delta * 3.5);
       material.uniforms.uProgress.value = progressRef.current;
     }
